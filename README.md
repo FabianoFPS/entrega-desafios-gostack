@@ -1,3 +1,0 @@
-Entrega de desafios Gostack (https://rocketseat.com.br/)
-
-Os desafios irão ficar salvos no repositorio ...
