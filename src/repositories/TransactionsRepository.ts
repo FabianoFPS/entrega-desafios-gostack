@@ -1,3 +1,5 @@
+import { EntityRepository, Repository } from 'typeorm';
+
 import Transaction from '../models/Transaction';
 
 interface Balance {
@@ -6,65 +8,39 @@ interface Balance {
   total: number;
 }
 
-interface Request {
-  title: string;
-  value: number;
-  type: 'income' | 'outcome';
-}
-
-interface Resume {
+interface TransactionList {
   transactions: Transaction[];
   balance: Balance;
 }
 
-class TransactionsRepository {
-  private transactions: Transaction[];
+@EntityRepository(Transaction)
+class TransactionsRepository extends Repository<Transaction> {
+  public async getBalance(): Promise<TransactionList> {
+    const transactions = await this.find();
 
-  constructor() {
-    this.transactions = [];
-  }
+    const balance = transactions.reduce(
+      (accumulator, transaction) => {
+        const calcBalance = {
+          income: (value: number): void => {
+            accumulator.income += value;
+            accumulator.total += value;
+          },
+          outcome: (value: number): void => {
+            accumulator.outcome += value;
+            accumulator.total -= value;
+          },
+        };
+        calcBalance[transaction.type](transaction.value);
+        return accumulator;
+      },
+      {
+        income: 0,
+        outcome: 0,
+        total: 0,
+      },
+    );
 
-  public all(): Resume {
-    const balance = this.getBalance();
-
-    return {
-      transactions: [...this.transactions],
-      balance,
-    };
-  }
-
-  public getBalance(): Balance {
-    function getIncome(acc: number, transaction: Transaction): number {
-      if (transaction.type === 'income') {
-        return acc + transaction.value;
-      }
-      return acc;
-    }
-
-    function getOutcome(acc: number, transaction: Transaction): number {
-      if (transaction.type === 'outcome') {
-        return acc + transaction.value;
-      }
-      return acc;
-    }
-
-    const income = this.transactions.reduce(getIncome, 0);
-    const outcome = this.transactions.reduce(getOutcome, 0);
-    const total = income - outcome;
-
-    const balance: Balance = {
-      income,
-      outcome,
-      total,
-    };
-    return balance;
-  }
-
-  public create({ title, value, type }: Request): Transaction {
-    const transaction = new Transaction({ title, value, type });
-
-    this.transactions.push(transaction);
-    return transaction;
+    return { transactions, balance } || null;
   }
 }
 
