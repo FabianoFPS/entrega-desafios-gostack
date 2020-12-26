@@ -1,136 +1,83 @@
 import React, { useState, useEffect } from 'react';
+import FeatherIcon from 'react-native-vector-icons/Feather';
 
-import incomeIco from '../../assets/income.svg';
-import outcomeIco from '../../assets/outcome.svg';
-import totalIco from '../../assets/total.svg';
-
-import api from '../../services/api';
-
-import Header from '../../components/Header';
+import { View } from 'react-native';
 
 import formatValue from '../../utils/formatValue';
+import { useCart } from '../../hooks/cart';
+import api from '../../services/api';
 
-import { Container, CardContainer, Card, TableContainer } from './styles';
+import FloatingCart from '../../components/FloatingCart';
 
-interface Transaction {
+import {
+  Container,
+  ProductContainer,
+  ProductImage,
+  ProductList,
+  Product,
+  ProductTitle,
+  PriceContainer,
+  ProductPrice,
+  ProductButton,
+} from './styles';
+
+interface Product {
   id: string;
   title: string;
-  value: number;
-  formattedValue: string;
-  formattedDate: string;
-  type: 'income' | 'outcome';
-  category: { title: string };
-  created_at: Date;
-}
-
-interface Balance {
-  income: string;
-  outcome: string;
-  total: string;
+  image_url: string;
+  price: number;
 }
 
 const Dashboard: React.FC = () => {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [balance, setBalance] = useState<Balance>({} as Balance);
+  const { addToCart } = useCart();
+
+  const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
-    async function loadTransactions(): Promise<void> {
-      api
-        .get('transactions')
-        .then(response => {
-          const storageTransactions = response.data.transactions;
-          const { income, outcome, total } = response.data.balance;
-
-          const transactionsFormated = storageTransactions.map(
-            (transaction: Transaction) => ({
-              ...transaction,
-              formattedValue:
-                transaction.type === 'outcome'
-                  ? `- ${formatValue(transaction.value)}`
-                  : formatValue(transaction.value),
-              formattedDate: new Date(transaction.created_at).toLocaleString(
-                'pt-br',
-              ),
-            }),
-          );
-
-          const balanceFormated: Balance = {
-            income: formatValue(income),
-            outcome: formatValue(outcome),
-            total: formatValue(total),
-          };
-
-          setTransactions(transactionsFormated);
-          setBalance(balanceFormated);
-        })
-        // eslint-disable-next-line no-console
-        .catch(err => console.log(err));
+    async function loadProducts(): Promise<void> {
+      const response = await api.get('products');
+      setProducts(response.data);
     }
-
-    loadTransactions();
+    try {
+      loadProducts();
+    } catch (error) {
+      console.log('Erro:', error.message);
+    }
   }, []);
 
-  return (
-    <>
-      <Header />
-      <Container>
-        <CardContainer>
-          <Card>
-            <header>
-              <p>Entradas</p>
-              <img src={incomeIco} alt="Income" />
-            </header>
-            <h1 data-testid="balance-income">
-              {balance ? balance.income : 'R$ 00,00'}
-            </h1>
-          </Card>
-          <Card>
-            <header>
-              <p>Saídas</p>
-              <img src={outcomeIco} alt="Outcome" />
-            </header>
-            <h1 data-testid="balance-outcome">
-              {balance ? balance.outcome : 'R$ 00,00'}
-            </h1>
-          </Card>
-          <Card total>
-            <header>
-              <p>Total</p>
-              <img src={totalIco} alt="Total" />
-            </header>
-            <h1 data-testid="balance-total">
-              {balance ? balance.total : 'R$ 00,00'}
-            </h1>
-          </Card>
-        </CardContainer>
+  function handleAddToCart(item: Product): void {
+    addToCart(item);
+  }
 
-        <TableContainer>
-          <table>
-            <thead>
-              <tr>
-                <th>Título</th>
-                <th>Preço</th>
-                <th>Categoria</th>
-                <th>Data</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactions &&
-                transactions.map(transaction => (
-                  <tr key={transaction.id}>
-                    <td className="title">{transaction.title}</td>
-                    <td className={transaction.type}>
-                      {transaction.formattedValue}
-                    </td>
-                    <td>{transaction.category.title}</td>
-                    <td>{transaction.formattedDate}</td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </TableContainer>
-      </Container>
-    </>
+  return (
+    <Container>
+      <ProductContainer>
+        <ProductList
+          data={products}
+          keyExtractor={item => item.id}
+          ListFooterComponent={<View />}
+          ListFooterComponentStyle={{
+            height: 80,
+          }}
+          renderItem={({ item }) => (
+            <Product>
+              <ProductImage source={{ uri: item.image_url }} />
+              <ProductTitle>{item.title}</ProductTitle>
+              <PriceContainer>
+                <ProductPrice>{formatValue(item.price)}</ProductPrice>
+                <ProductButton
+                  testID={`add-to-cart-${item.id}`}
+                  onPress={() => handleAddToCart(item)}
+                >
+                  <FeatherIcon size={25} name="plus" color="#C4C4C4" />
+                </ProductButton>
+              </PriceContainer>
+            </Product>
+          )}
+        />
+      </ProductContainer>
+      <FloatingCart />
+    </Container>
   );
 };
 
